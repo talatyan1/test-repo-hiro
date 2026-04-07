@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Sensitive files
+.env
+credentials.json
+token.json
+chrome_profile/
+chrome_profile_test/
+chrome_profile_v13/
+
+# Logs and debug info
+*.log
+*_log.txt
+logs/
+actual_profile_*.png
+element_not_found_*.png
+v*_error_*.png
+v*_fail_*.png
+v*_success_*.png
+v*_done_*.png
+v*_final_*.png
+v*_pre_*.png
+v*_notfound_*.png
+debug_*.png
+get_files.py
+search_fail.png
+search_success.png
+cw_portfolios_done.png
+lancers_portfolio_err.png
+lancers_reuse_success.png
+coconala_edit_page_debug.png
+crowdworks_spa_success.png
+job_page_source.html
+job_page_text.txt
+ui_dump*.json
+result.txt
+final_result.txt
+step3_result.txt
+update_log*.txt
+portfolio_log*.txt
+
+# Data
+*.csv
+*.xlsx
+data/
+downloads/
+
+# Binaries
+chromedriver.exe
+chromedriver_old.exe
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
