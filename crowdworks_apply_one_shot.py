@@ -60,9 +60,24 @@ async def run():
         
         try:
             app_logger.info(f"[*] クラウドワークス応募開始: {job_url}")
-            await page.goto(job_url)
-            await page.wait_for_load_state("networkidle")
+            # domcontentloaded で待機を打ち切り、要素があれば処理を開始するように高速化
+            await page.goto(job_url, wait_until="domcontentloaded")
             
+            # --- 初期アクセス時の成功判定 (既に応募済み・リダイレクトの場合など) ---
+            # ページ内容もチェックして「応募済み」メッセージが出ていないか確認
+            page_text = await page.content()
+            success_indicators = ["complete", "applied", "messages", "contracts"]
+            if any(k in page.url for k in success_indicators) or "すでに相談または応募" in page_text:
+                app_logger.info(f"✅ 既に応募済み、または完了ページを検知しました。終了します。 (URL: {page.url})")
+                await page.screenshot(path="crowdworks_spa_already_done.png")
+                return # 正常終了
+
+            # 通信が安定するまで少しだけ待つ
+            try:
+                await page.wait_for_load_state("networkidle", timeout=5000)
+            except:
+                pass
+
             # --- 契約金額セクション ---
             amount_input = page.locator('input[name="proposal[budget]"], input#proposal_budget').first
             if await amount_input.count() > 0:
@@ -97,7 +112,6 @@ async def run():
                 
                 # --- 即完了の判定 (追加) ---
                 # 案件によっては確認画面がなく、直接応募が完了してメッセージルームへ飛ぶ場合がある
-                success_indicators = ["complete", "applied", "messages", "contracts"]
                 current_url = page.url
                 page_text = await page.content()
                 
