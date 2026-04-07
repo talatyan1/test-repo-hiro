@@ -45,7 +45,7 @@ async def js_click_with_retry(page, selector, label="ボタン", max_retries=3):
 
 async def run():
     async with async_playwright() as p:
-        # ヘッドレスモードをオフにしてUI挙動を確認
+        # ヘッドレスモードをオフにしてUI挙動を確認 (100%確実な操作のため)
         browser = await p.chromium.launch(headless=False)
         
         state_file = r"c:\Users\nagas\.gemini\antigravity\Hiro\crowd_agent\src\crawlers\state_crowdworks.json"
@@ -89,28 +89,40 @@ async def run():
             app_logger.info("[*] フォーム入力完了。確認画面へ進みます...")
             await asyncio.sleep(2)
             
-            # ステップ1: 確認画面へ進むボタン
+            # ステップ1: 確認画面へ進む（または直接応募）ボタン
             confirm_selector = 'input[type="submit"][value="応募する"], input[type="submit"][value="内容を確認する"], button:has-text("確認する")'
             if await js_click_with_retry(page, confirm_selector, label="確認画面ボタン"):
                 await page.wait_for_load_state("networkidle")
                 await asyncio.sleep(3)
                 
-                # ステップ2: 最終確定ボタン (確認画面に遷移した場合)
+                # --- 即完了の判定 (追加) ---
+                # 案件によっては確認画面がなく、直接応募が完了してメッセージルームへ飛ぶ場合がある
+                success_indicators = ["complete", "applied", "messages", "contracts"]
+                current_url = page.url
+                page_text = await page.content()
+                
+                if any(k in current_url for k in success_indicators) or "応募を完了しました" in page_text or "メッセージを投稿する" in page_text:
+                    app_logger.info(f"✅ クラウドワークス応募完了！ (直接遷移/メッセージ画面検知: {current_url})")
+                    await page.screenshot(path="crowdworks_spa_success_direct.png")
+                    return # 正常終了
+                
+                # ステップ2: 最終確定ボタン (確認画面に遷移した場合のみ)
                 final_selector = 'input[type="submit"][value="応募する"], button:has-text("この内容で応募する")'
+                # 確認画面かどうかを判定
                 if await page.locator(final_selector).count() > 0:
                     app_logger.info("[*] 最終確認画面を検知。確定ボタンを押します...")
                     if await js_click_with_retry(page, final_selector, label="最終応募ボタン"):
                         await page.wait_for_load_state("networkidle")
                         await asyncio.sleep(5)
                 
-                # 成功判定
-                success_indicators = ["complete", "applied", "history"]
+                # 最終的な成功判定
+                current_url = page.url
                 page_text = await page.content()
-                if any(k in page.url for k in success_indicators) or "応募を完了しました" in page_text:
-                    app_logger.info(f"✅ クラウドワークス応募完了！ (URL: {page.url})")
-                    await page.screenshot(path="crowdworks_spa_success.png")
+                if any(k in current_url for k in success_indicators) or "応募を完了しました" in page_text or "メッセージを投稿する" in page_text:
+                    app_logger.info(f"✅ クラウドワークス応募完了！ (最終URL: {current_url})")
+                    await page.screenshot(path="crowdworks_spa_success_final.png")
                 else:
-                    app_logger.error(f"❌ 応募完了判定に失敗しました。URL: {page.url}")
+                    app_logger.error(f"❌ 応募完了の確証が得られませんでした。URL: {current_url}")
                     await page.screenshot(path="crowdworks_spa_fail_check.png")
             else:
                 app_logger.error("❌ 確認ボタンのクリックに失敗しました。")
@@ -119,6 +131,7 @@ async def run():
             app_logger.error(f"[!] 致命的なエラーが発生しました: {e}")
             await page.screenshot(path="crowdworks_spa_fatal_error.png")
         finally:
+            # 状況確認のため、ブラウザ維持または待機
             await asyncio.sleep(5)
             await browser.close()
 
